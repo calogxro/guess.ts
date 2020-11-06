@@ -1,3 +1,3 @@
-# guess.js
+# guess.ts
 
-Anatomy of a game (in TypeScript)
+Anatomy of a game in TypeScript
