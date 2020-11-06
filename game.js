@@ -1,222 +1,177 @@
-const _ = {
-    random: array => array[Math.floor(Math.random() * array.length)],
-    range: n => Array(n).fill(0).map((x, i) => i)
-}
-
-class Game {
-    constructor(faces) {
-        this.player = 'X'
-        this.utility = 0
-        this.numbers = {
-            'X': null,
-            'O': null
-        }
-        this._actions = _.range(faces).map(i => i+1)
-        this.numberToGuess = _.random( this.actions())
+"use strict";
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+exports.__esModule = true;
+var readline = require("readline");
+var _ = {
+    random: function (array) { return array[Math.floor(Math.random() * array.length)]; },
+    range: function (n) { return Array(n).fill(0).map(function (x, i) { return i; }); }
+};
+var Game = /** @class */ (function () {
+    function Game(faces) {
+        this.player = 'X';
+        this.utility = 0;
+        this.choices = { X: null, O: null };
+        this.actions = _.range(faces).map(function (i) { return i + 1; });
+        this.numberToGuess = _.random(this.actions);
     }
-
-    actions() {
-        return this._actions
-    }
-
-    apply(action) {
-        if ( ! this.terminalTest()) {
-            
-            const actions = this.actions()
-
-            if (actions.includes(action)) {
-
-                this.numbers[this.player] = action
-
-                this.player = this.player === 'X' ? 'O' : 'X'
-
-                if (this.terminalTest()) {
-                    if (this.numbers['X'] === this.numberToGuess) {
-                        this.utility += 1
-                    }
-                    
-                    if (this.numbers['O'] === this.numberToGuess) {
-                        this.utility += -1
-                    }
+    Game.prototype.nextPlayer = function () {
+        return this.player === 'X' ? 'O' : 'X';
+    };
+    Game.prototype.terminalTest = function () {
+        return this.choices['X'] !== null && this.choices['O'] !== null;
+    };
+    Game.prototype.apply = function (action) {
+        if (!this.terminalTest() && this.actions.includes(action)) {
+            this.choices[this.player] = action;
+            this.player = this.nextPlayer();
+            if (this.terminalTest()) {
+                if (this.choices['X'] === this.numberToGuess) {
+                    this.utility += 1;
+                }
+                if (this.choices['O'] === this.numberToGuess) {
+                    this.utility += -1;
                 }
             }
         }
+    };
+    return Game;
+}());
+var View = /** @class */ (function () {
+    function View() {
     }
-
-    terminalTest() {
-        return this.numbers['X'] !== null && this.numbers['O'] !== null
-    }
-}
-
-class View {
-    render(state) {
-        if (state.numbers['X'] !== null || state.numbers['O'] !== null) {
-            const player = state.player === 'X' ? 'O' : 'X'
-
-            console.log(player, 'plays', state.numbers[player])
+    View.prototype.render = function (state) {
+        if (state.choices['X'] !== null || state.choices['O'] !== null) {
+            var player = state.player === 'X' ? 'O' : 'X';
+            console.log(player, 'plays', state.choices[player]);
         }
-
-        //console.log(state)
-    }
-
-    onGameOver(state) {
-        console.log()
-
-        console.log(state.numberToGuess, 'was the number to guess')
-
-        console.log()
-        
+    };
+    View.prototype.onGameOver = function (state) {
+        console.log();
+        console.log(state.numberToGuess, 'was the number to guess', '\n');
         if (state.utility === 0) {
-            console.log('\x1b[33m%s\x1b[0m', 'IT\'S A TIE')
+            console.log('\x1b[33m%s\x1b[0m', 'IT\'S A TIE');
         }
         else {
-            console.log('\x1b[33m%s\x1b[0m', state.utility === 1 ? 'X' : 'O', 'WINS')
+            console.log('\x1b[33m%s\x1b[0m', state.utility === 1 ? 'X' : 'O', 'WINS');
         }
+    };
+    return View;
+}());
+var Player = /** @class */ (function () {
+    function Player(id) {
+        this.id = id;
     }
-}
-
-class AbstractPlayer {
-    constructor(id) {
-        this.id = id
+    Player.prototype.onAction = function (action) {
+        this.gameController.onAction(action);
+    };
+    return Player;
+}());
+var AIPlayer = /** @class */ (function (_super) {
+    __extends(AIPlayer, _super);
+    function AIPlayer(id, strategy) {
+        var _this = _super.call(this, id) || this;
+        _this.strategy = strategy;
+        return _this;
     }
-
-    takeTurn(game) {}
-
-    play(action) {
-        this.onPlay(action)
+    AIPlayer.prototype.takeTurn = function (game) {
+        this.strategy.makeDecision(game, this.onAction.bind(this));
+    };
+    AIPlayer.prototype.onGameOver = function () {
+    };
+    return AIPlayer;
+}(Player));
+var HumanPlayer = /** @class */ (function (_super) {
+    __extends(HumanPlayer, _super);
+    function HumanPlayer(id, actionController) {
+        var _this = _super.call(this, id) || this;
+        _this.actionController = actionController;
+        return _this;
     }
-
-    onPlay(action) {}
-
-    onGameOver() {}
-}
-
-class AIPlayer extends AbstractPlayer {
-    constructor(id, strategy) {
-        super(id)
-        this.strategy = strategy
+    HumanPlayer.prototype.takeTurn = function (game) {
+        this.actionController.prompt(this.onAction.bind(this));
+    };
+    HumanPlayer.prototype.onGameOver = function () {
+    };
+    return HumanPlayer;
+}(Player));
+var RandomDecision = /** @class */ (function () {
+    function RandomDecision() {
     }
-
-    takeTurn(game) {
-        //return this.strategy.makeDecision(game)
-        
-        this.strategy.makeDecision(game, (action) => {
-            this.play(action)
-        })
+    RandomDecision.prototype.makeDecision = function (game, onAction) {
+        var action = _.random(game.actions);
+        onAction(action);
+    };
+    return RandomDecision;
+}());
+var GameController = /** @class */ (function () {
+    function GameController(game, players, view) {
+        this.game = game;
+        this.players = players;
+        this.view = view;
     }
-}
-
-class AbstractPlayerStrategy {
-    static makeDecision(game) {}
-}
-
-class RandomDecision extends AbstractPlayerStrategy {
-    static makeDecision(game, onAction) {
-        //return _.random( game.actions())
-        
-        const action = _.random( game.actions())
-        onAction(action)
-    }
-}
-
-class HumanPlayer extends AbstractPlayer {
-    constructor(id, inputListener) {
-        super(id)
-        this.inputListener = inputListener
-    }
-
-    takeTurn(game) {
-        this.inputListener.onAction((action) => {
-            this.play(action)
-        })
-    }
-
-    onGameOver() {
-        this.inputListener.close()
-    }
-}
-
-class GameController {
-    constructor(game, players, view) {
-        this.game = game
-        this.players = players
-        this.view = view
-    }
-
-    start() {
-        this.onStateChanged()
-    }
-
-    onStateChanged() {
-        this.view.render(this.game)
-        this.loop()
-    }
-
-    loop() {
-        if ( ! this.game.terminalTest()) {
-            const player = this.players.get( this.game.player)
-
-            //this.game.apply( player.play(this.game))
-
-            player.onPlay = (action) => {
-                this.game.apply(action)
-                this.onStateChanged()
-            }
-
-            player.takeTurn(this.game)
+    GameController.prototype.start = function () {
+        this.onStateChanged();
+    };
+    GameController.prototype.onAction = function (action) {
+        this.game.apply(action);
+        this.onStateChanged();
+    };
+    GameController.prototype.onStateChanged = function () {
+        this.view.render(this.game);
+        this.loop();
+    };
+    GameController.prototype.loop = function () {
+        if (!this.game.terminalTest()) {
+            var player = this.players.get(this.game.player);
+            player.takeTurn(this.game);
         }
         else {
-            this.players.forEach((player) => {
-                player.onGameOver()
-            })
-    
-            this.view.onGameOver(this.game)
+            this.players.forEach(function (player) {
+                player.onGameOver();
+            });
+            this.view.onGameOver(this.game);
         }
+    };
+    return GameController;
+}());
+var ActionController = /** @class */ (function () {
+    function ActionController(promptMessage) {
+        if (promptMessage === void 0) { promptMessage = '>'; }
+        this.promptMessage = promptMessage + '>';
     }
-}
-
-class InputListener {
-    constructor(promptMessage='') {
-        const readline = require('readline')
-        
-        this.rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
-            prompt: promptMessage + '> '
-        })
-        
-        this.rl.on('line', this.onInput.bind(this))
-    }
-
-    onInput(action) {
-        this._onAction( parseInt(action))
-    }
-
-    onAction(_onAction) {
-        this._onAction = _onAction
-        this.rl.prompt()
-    }
-
-    close() {
-        this.rl.close()
-    }
-}
-
-
-const faces = 6
-
-const game = new Game(faces)
-const view = new View()
-
-const p0 = new HumanPlayer('X', new InputListener('guess a number from 1-'+faces))
-//const p0 = new AIPlayer('X', RandomDecision)
-const p1 = new AIPlayer('O', RandomDecision)
-
-const players = new Map([
-    [p0.id, p0], 
+    ActionController.prototype.prompt = function (onAction) {
+        var rl = readline.createInterface(process.stdin, process.stdout);
+        rl.question(this.promptMessage, function (action) {
+            onAction(parseInt(action));
+            rl.close();
+        });
+    };
+    return ActionController;
+}());
+var faces = 6;
+var game = new Game(faces);
+var view = new View();
+var p0 = new HumanPlayer('X', new ActionController('guess a number from 1-' + faces));
+//const p0 = new AIPlayer('X', new RandomDecision());
+var p1 = new AIPlayer('O', new RandomDecision());
+var players = new Map([
+    [p0.id, p0],
     [p1.id, p1]
-])
-
-const gameController = new GameController(game, players, view)
-
-gameController.start()
+]);
+var gameController = new GameController(game, players, view);
+players.forEach(function (player) {
+    player.gameController = gameController;
+});
+gameController.start();
