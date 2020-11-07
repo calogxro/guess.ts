@@ -6,14 +6,14 @@ const _ = {
 }
 
 class Game {
-    player: string;
+    playerId: string;
     utility: number;
     choices: { X: number; O: number; };
     actions: number[];
     numberToGuess: number;
 
     constructor(faces: number) {
-        this.player = 'X';
+        this.playerId = 'X';
         this.utility = 0;
         this.choices = { X: null, O: null };
         this.actions = _.range(faces).map(i => i+1);
@@ -21,7 +21,7 @@ class Game {
     }
 
     private nextPlayer() {
-        return this.player === 'X' ? 'O' : 'X';
+        return this.playerId === 'X' ? 'O' : 'X';
     }
 
     terminalTest() {
@@ -30,8 +30,8 @@ class Game {
 
     apply(action: number) {
         if ( ! this.terminalTest() && this.actions.includes(action)) {
-            this.choices[this.player] = action;
-            this.player = this.nextPlayer();
+            this.choices[this.playerId] = action;
+            this.playerId = this.nextPlayer();
             if (this.terminalTest()) {
                 if (this.choices['X'] === this.numberToGuess) {
                     this.utility += 1;
@@ -47,8 +47,8 @@ class Game {
 class View {
     render(state: Game) {
         if (state.choices['X'] !== null || state.choices['O'] !== null) {
-            const player = state.player === 'X' ? 'O' : 'X';
-            console.log(player, 'plays', state.choices[player]);
+            const playerId = state.playerId === 'X' ? 'O' : 'X';
+            console.log(playerId, 'plays', state.choices[playerId]);
         }
     }
 
@@ -58,15 +58,43 @@ class View {
         
         if (state.utility === 0) {
             console.log('\x1b[33m%s\x1b[0m', 'IT\'S A TIE');
-        } else {
+        } 
+        else {
             console.log('\x1b[33m%s\x1b[0m', state.utility === 1 ? 'X' : 'O', 'WINS');
         }
     }
 }
 
+class ActionController {
+    private promptMessage: string;
+    
+    constructor(promptMessage = '> ') {
+        this.promptMessage = promptMessage + ': ';
+    }
+    
+    prompt(onAction: (action: any) => void) {
+        let rl = readline.createInterface(process.stdin, process.stdout);
+        rl.question(this.promptMessage, (action) => {
+            onAction(parseInt(action));
+            rl.close();
+        });
+    }
+}
+
+interface PlayerStrategy {
+    makeDecision(game: Game, onAction: (action: any) => void): void;
+}
+
+class RandomDecision implements PlayerStrategy {
+    makeDecision(game: Game, onAction: (action: any) => void) {
+        const action = _.random(game.actions);
+        onAction(action);
+    }
+}
+
 abstract class Player {
     id: string;
-    gameController: GameController;
+    private gameController: GameController;
 
     constructor(id: string) {
         this.id = id;
@@ -75,6 +103,10 @@ abstract class Player {
     abstract takeTurn(game: Game): void;
 
     abstract onGameOver(): void;
+
+    setGameController(gameController: GameController) {
+        this.gameController = gameController;
+    }
 
     onAction(action) {
         this.gameController.onAction(action);
@@ -98,7 +130,7 @@ class AIPlayer extends Player {
 }
 
 class HumanPlayer extends Player {
-    actionController: ActionController;
+    private actionController: ActionController;
 
     constructor(id: string, actionController: ActionController) {
         super(id);
@@ -113,17 +145,6 @@ class HumanPlayer extends Player {
     }
 }
 
-interface PlayerStrategy {
-    makeDecision(game: Game, onAction: (action: any) => void): void;
-}
-
-class RandomDecision implements PlayerStrategy {
-    makeDecision(game: Game, onAction: (action: any) => void) {
-        const action = _.random(game.actions);
-        onAction(action);
-    }
-}
-
 class GameController {
     private game: Game;
     private players: Map<string, Player>;
@@ -133,6 +154,10 @@ class GameController {
         this.game = game;
         this.players = players;
         this.view = view;
+
+        players.forEach((player) => { 
+            player.setGameController(this); 
+        });
     }
 
     start() {
@@ -151,7 +176,7 @@ class GameController {
 
     private loop() {
         if ( ! this.game.terminalTest()) {
-            const player = this.players.get(this.game.player);
+            const player = this.players.get(this.game.playerId);
             
             player.takeTurn(this.game);
         }
@@ -165,41 +190,24 @@ class GameController {
     }
 }
 
-class ActionController {
-    private promptMessage: string;
-    
-    constructor(promptMessage = '>') {
-        this.promptMessage = promptMessage + '>';
-    }
-    
-    prompt(onAction: (action: any) => void) {
-        let rl = readline.createInterface(process.stdin, process.stdout);
-        rl.question(this.promptMessage, (action) => {
-            onAction(parseInt(action));
-            rl.close();
-        });
-    }
-}
+function start(p0: Player, p1: Player, faces: number) {
+    const game = new Game(faces);
+    const view = new View();
 
+    const players = new Map<string, Player>([
+        [p0.id, p0], 
+        [p1.id, p1]
+    ]);
+
+    const gameController = new GameController(game, players, view);
+
+    gameController.start();
+}
 
 const faces = 6;
 
-const game = new Game(faces);
-const view = new View();
-
-const p0 = new HumanPlayer('X', new ActionController('guess a number from 1-'+faces));
+const p0 = new HumanPlayer('X', new ActionController(`Guess a number from 1-${faces}`));
 //const p0 = new AIPlayer('X', new RandomDecision());
 const p1 = new AIPlayer('O', new RandomDecision());
 
-const players = new Map<string, Player>([
-    [p0.id, p0], 
-    [p1.id, p1]
-]);
-
-const gameController = new GameController(game, players, view);
-
-players.forEach((player) => { 
-    player.gameController = gameController; 
-});
-
-gameController.start();
+start(p0, p1, faces);
